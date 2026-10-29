@@ -16,9 +16,25 @@
 #
 # Optional: DONER_VERSION=0.2.0 DONER_VERSION_CODE=2 DONER_AAB=1 (Play Store bundle)
 #           DONER_BUNDLE_ID=com.you.app  UNITY_PATH=/path/to/Unity
+#
+# GitHub release: after a successful build the file is published as release v<version>
+# (needs the GitHub CLI: `brew install gh && gh auth login`). Skip with DONER_RELEASE=0.
+# Building the same version again replaces that release's file.
 # Close the project in the Unity editor first — a project can be open in only one Unity.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+export DONER_VERSION="${DONER_VERSION:-0.1.0}"
+RELEASE="${DONER_RELEASE:-1}"
+EXT=$([ "${DONER_AAB:-0}" = "1" ] && echo aab || echo apk)
+OUT="Builds/Android/DonerMaster-$DONER_VERSION.$EXT"
+export DONER_OUTPUT="$OUT"
+
+# Check the GitHub side before spending 10 minutes on a build
+if [ "$RELEASE" = "1" ]; then
+  command -v gh >/dev/null || { echo "GitHub CLI yok: brew install gh && gh auth login  (ya da DONER_RELEASE=0)"; exit 1; }
+  gh auth status >/dev/null 2>&1 || { echo "GitHub'a giriş yapılmamış: gh auth login"; exit 1; }
+fi
 
 UNITY="${UNITY_PATH:-$(ls -d /Applications/Unity/Hub/Editor/6000.*/Unity.app/Contents/MacOS/Unity 2>/dev/null | sort -V | tail -1 || true)}"
 if [ -z "$UNITY" ] || [ ! -x "$UNITY" ]; then
@@ -50,5 +66,25 @@ if [ $CODE -ne 0 ]; then
   echo "Build başarısız (exit $CODE). Hatalar için: grep -i error $LOG"
   exit $CODE
 fi
-ls -lh Builds/Android/
-echo "Telefona kurmak için (USB debugging açık): adb install -r Builds/Android/*.apk"
+ls -lh "$OUT"
+
+if [ "$RELEASE" = "1" ]; then
+  TAG="v$DONER_VERSION"
+  COMMIT=$(git rev-parse HEAD)
+  if ! git diff --quiet HEAD -- Assets Packages 2>/dev/null; then
+    echo "Uyarı: Assets/Packages altında commit edilmemiş değişiklik var; release $COMMIT commit'ine etiketlenecek."
+  fi
+  if gh release view "$TAG" >/dev/null 2>&1; then
+    echo "Release $TAG zaten var — dosya güncelleniyor..."
+    gh release upload "$TAG" "$OUT" --clobber
+  else
+    echo "GitHub release oluşturuluyor: $TAG"
+    gh release create "$TAG" "$OUT" \
+      --target "$COMMIT" \
+      --title "Doner Master $DONER_VERSION" \
+      --generate-notes
+  fi
+  echo "Release: $(gh release view "$TAG" --json url -q .url)"
+fi
+
+echo "Telefona kurmak için (USB debugging açık): adb install -r $OUT"

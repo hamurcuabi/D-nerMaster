@@ -20,6 +20,8 @@ export DONER_KEYSTORE_PASS='şifren'
 ./Tools/build-android.sh            # → Builds/Android/DonerMaster-0.1.0.apk
 ```
 
+Build bitince dosya GitHub'da **v<sürüm>** release'i olarak yayınlanır (gerekli: `brew install gh && gh auth login`; kapatmak için `DONER_RELEASE=0`). Aynı sürümü tekrar build edersen o release'teki dosya güncellenir.
+
 Sürüm: `DONER_VERSION=0.2.0 DONER_VERSION_CODE=2`. Play Store için AAB: `DONER_AAB=1`. Build sırasında proje Unity editöründe açık olmamalı.
 
 Diğer menüler: **Reset Save Data**, **Give 1000 Coins (debug)** (Play modundayken).
