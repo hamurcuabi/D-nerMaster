@@ -64,10 +64,15 @@ set -e
 
 grep "\[DonerBuild\]" "$LOG" || true
 if [ $CODE -ne 0 ]; then
-  if grep -qiE "no valid unity editor license|license is not active|licens(e|ing).*(fail|error|not found)" "$LOG"; then
-    echo "Unity lisansı yok. Unity Hub'ı aç → giriş yap → Preferences → Licenses → Add → Get a free personal license. Sonra tekrar çalıştır."
+  echo
+  echo "---- Hata ----"
+  # The build script prints the failing step's messages with this prefix
+  grep -A12 "\[DonerBuild\] FAILED" "$LOG" | grep -v "^--$" | head -40 || true
+  grep -E "error CS[0-9]+|UnityException|BuildFailedException|Exception:" "$LOG" | grep -v "\[DonerBuild\]" | sort -u | head -20 || true
+  if grep -qiE "No valid Unity Editor license|com.unity.editor.headless was not found" "$LOG"; then
+    echo "Unity lisansı bulunamadı: Unity Hub → Preferences → Licenses → Add → Get a free personal license."
   fi
-  echo "Build başarısız (exit $CODE). Hatalar için: grep -i error $LOG"
+  echo "Build başarısız (exit $CODE). Tam log: $LOG"
   exit $CODE
 fi
 ls -lh "$OUT"

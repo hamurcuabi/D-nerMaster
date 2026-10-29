@@ -46,7 +46,12 @@ namespace DonerMaster.EditorTools
                 var s = report.summary;
                 if (s.result != BuildResult.Succeeded)
                 {
-                    Debug.LogError("[DonerBuild] FAILED: " + s.result + " (" + s.totalErrors + " errors)");
+                    var sb = new System.Text.StringBuilder();
+                    foreach (var step in report.steps)
+                        foreach (var m in step.messages)
+                            if (m.type == LogType.Error || m.type == LogType.Exception)
+                                sb.AppendLine("  [" + step.name + "] " + m.content);
+                    Debug.LogError("[DonerBuild] FAILED: " + s.result + " (" + s.totalErrors + " errors)\n" + sb);
                     Exit(1);
                     return;
                 }

@@ -168,6 +168,7 @@ namespace UnityEngine
     public static class Screen { public static int width, height; public static int sleepTimeout; }
     public static class SleepTimeout { public const int NeverSleep = -1; }
     public static class Application { public static int targetFrameRate; public static bool isPlaying; public static bool isBatchMode; }
+    public enum LogType { Error, Assert, Warning, Log, Exception }
     public static class Debug { public static void Log(object o) { } public static void LogWarning(object o) { } public static void LogError(object o) { } }
     public static class PlayerPrefs
     {
@@ -434,7 +435,9 @@ namespace UnityEditor.Build.Reporting
 {
     public enum BuildResult { Unknown, Succeeded, Failed, Cancelled }
     public struct BuildSummary { public BuildResult result; public int totalErrors; public ulong totalSize; }
-    public class BuildReport { public BuildSummary summary => default; }
+    public struct BuildStepMessage { public UnityEngine.LogType type; public string content; }
+    public struct BuildStep { public string name; public BuildStepMessage[] messages; }
+    public class BuildReport { public BuildSummary summary => default; public BuildStep[] steps => null; }
 }
 namespace UnityEditor.SceneManagement
 {

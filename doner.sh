@@ -105,6 +105,7 @@ BT="$(ls "$SDK/build-tools" 2>/dev/null | sort -V | tail -1 || true)"
 [ -n "$BT" ] && [ "${BT%%.*}" -ge 34 ] 2>/dev/null || MISSING+=("build-tools;36.0.0")
 [ -x "$SDK/platform-tools/adb" ] || MISSING+=("platform-tools")
 [ -d "$SDK/ndk/$NDK_VER" ] || MISSING+=("ndk;$NDK_VER")
+[ -d "$SDK/cmake/3.22.1" ] || MISSING+=("cmake;3.22.1")     # Unity 6 build step requires exactly this
 
 if [ ${#MISSING[@]} -gt 0 ]; then
   SDKM="$(find_sdkmanager "$SDK")"
@@ -113,7 +114,7 @@ if [ ${#MISSING[@]} -gt 0 ]; then
   yes | "$SDKM" --sdk_root="$SDK" --licenses >/dev/null 2>&1 || true
   "$SDKM" --sdk_root="$SDK" "${MISSING[@]}" || die "SDK paketleri kurulamadı: ${MISSING[*]}"
 fi
-ok "platform 36, build-tools, adb ve NDK r27c hazır (indirilen: ${#MISSING[@]} paket)"
+ok "platform 36, build-tools, adb, NDK r27c ve CMake 3.22.1 hazır (indirilen: ${#MISSING[@]} paket)"
 NDK="$SDK/ndk/$NDK_VER"
 
 # ------------------------------------------------------------------ 4. Unity
