@@ -71,8 +71,24 @@ find_sdk() {
     [ -n "$c" ] && { [ -d "$c/platforms" ] || [ -d "$c/cmdline-tools" ]; } && { echo "$c"; return; }
   done
 }
+# cmdline-tools 23+ turned sdkmanager into a wrapper around the new "Android CLI", whose output
+# Unity cannot parse (it then reads every component as version 0.0). Use a classic one (< 23).
+CLASSIC_CLT="16.0"
+clt_rev() { sed -n 's/^Pkg.Revision=//p' "$1/source.properties" 2>/dev/null | head -1; }
+find_classic_clt() {   # prints the newest cmdline-tools folder older than 23, or nothing
+  local d best="" bestv=""
+  for d in "$1"/cmdline-tools/*/; do
+    d="${d%/}"; local v; v="$(clt_rev "$d")"
+    [ -n "$v" ] && [ -x "$d/bin/sdkmanager" ] || continue
+    [ "${v%%.*}" -lt 23 ] 2>/dev/null || continue
+    if [ -z "$bestv" ] || [ "$(printf '%s\n%s\n' "$bestv" "$v" | sort -V | tail -1)" = "$v" ]; then best="$d"; bestv="$v"; fi
+  done
+  echo "$best"
+}
 find_sdkmanager() {
-  local m
+  local d m
+  d="$(find_classic_clt "$1")"
+  if [ -n "$d" ]; then echo "$d/bin/sdkmanager"; return; fi
   m="$(ls "$1"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | sort -V | tail -1 || true)"
   [ -z "$m" ] && m="$(command -v sdkmanager || true)"
   echo "$m"
@@ -112,6 +128,7 @@ version_ge "$BT" "36.0.0" || MISSING+=("build-tools;36.0.0")
 version_ge "$(pkg_rev "$SDK/platform-tools")" "37.0.0" || MISSING+=("platform-tools")
 [ -d "$SDK/ndk/$NDK_VER" ] || MISSING+=("ndk;$NDK_VER")
 [ -d "$SDK/cmake/3.22.1" ] || MISSING+=("cmake;3.22.1")     # Unity 6 build step requires exactly this
+[ -n "$(find_classic_clt "$SDK")" ] || MISSING+=("cmdline-tools;$CLASSIC_CLT")   # Unity can't read the 23+ CLI
 
 if [ ${#MISSING[@]} -gt 0 ]; then
   SDKM="$(find_sdkmanager "$SDK")"
@@ -200,7 +217,31 @@ link_tool() {   # link_tool <name> <target>
   fi
   ok "Unity $1 → $2"
 }
-link_tool SDK "$SDK"
+# Unity's SDK: a folder of links to the Mac's SDK, except cmdline-tools, where Unity only sees the
+# classic sdkmanager. Android Studio keeps using the real SDK untouched.
+make_sdk_view() {
+  local view="$ANDROID_DIR/SDK" clt e name
+  clt="$(find_classic_clt "$SDK")"
+  [ -n "$clt" ] || die "Klasik cmdline-tools (<23) bulunamadı: $SDK/cmdline-tools"
+  if [ -L "$view" ]; then rm -f "$view"; fi
+  if [ -d "$view" ] && [ ! -f "$view/.doner-sdk-view" ]; then
+    local bak="$view.hub-backup"; [ -e "$bak" ] && bak="$view.hub-backup-$(date +%s)"
+    mv "$view" "$bak" || die "$view kenara alınamadı."
+    echo "  Unity Hub'ın SDK klasörü kenara alındı: $bak"
+  fi
+  mkdir -p "$view" && touch "$view/.doner-sdk-view"
+  for e in "$SDK"/* "$SDK"/.knownPackages "$SDK"/licenses; do
+    [ -e "$e" ] || continue
+    name="$(basename "$e")"
+    [ "$name" = "cmdline-tools" ] && continue
+    ln -sfn "$e" "$view/$name"
+  done
+  rm -rf "$view/cmdline-tools"; mkdir -p "$view/cmdline-tools"
+  # one entry only: a second alias (e.g. "latest") makes sdkmanager print duplicate-package warnings
+  ln -sfn "$clt" "$view/cmdline-tools/$(basename "$clt")"
+  ok "Unity SDK → $SDK (cmdline-tools $(clt_rev "$clt"))"
+}
+make_sdk_view
 link_tool NDK "$NDK"
 link_tool OpenJDK "$JDK"
 
