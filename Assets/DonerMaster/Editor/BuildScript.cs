@@ -131,6 +131,34 @@ namespace DonerMaster.EditorTools
             PlayerSettings.Android.keyaliasName = Env("DONER_KEY_ALIAS", "doner");
             PlayerSettings.Android.keyaliasPass = Env("DONER_KEY_PASS", PlayerSettings.Android.keystorePass);
             EditorUserBuildSettings.development = false;
+            IncludeRuntimeShaders();
+        }
+
+        /// <summary>
+        /// The game creates its materials in code (Shader.Find), and Unity strips shaders that no asset
+        /// references. Without this, particles and UI-free unlit objects would render pink on the phone.
+        /// </summary>
+        static void IncludeRuntimeShaders()
+        {
+            string[] names = { "Standard", "Unlit/Color", "Sprites/Default", "Legacy Shaders/Particles/Alpha Blended", "Legacy Shaders/Diffuse" };
+            var gs = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>("ProjectSettings/GraphicsSettings.asset");
+            if (gs == null) return;
+            var so = new SerializedObject(gs);
+            var list = so.FindProperty("m_AlwaysIncludedShaders");
+            if (list == null) return;
+            foreach (var n in names)
+            {
+                var sh = Shader.Find(n);
+                if (sh == null) continue;
+                bool present = false;
+                for (int i = 0; i < list.arraySize; i++)
+                    if (list.GetArrayElementAtIndex(i).objectReferenceValue == sh) { present = true; break; }
+                if (present) continue;
+                list.InsertArrayElementAtIndex(list.arraySize);
+                list.GetArrayElementAtIndex(list.arraySize - 1).objectReferenceValue = sh;
+            }
+            so.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.SaveAssets();
         }
 
         /// <summary>Creates the bootstrap scene and puts it in Build Settings if it is not there yet (no dialogs).</summary>

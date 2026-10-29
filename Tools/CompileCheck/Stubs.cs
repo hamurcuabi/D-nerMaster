@@ -415,7 +415,9 @@ namespace UnityEditor
     public static class BuildPipeline { public static Build.Reporting.BuildReport BuildPlayer(BuildPlayerOptions o) => null; }
     public static class EditorUserBuildSettings { public static bool buildAppBundle, development; }
     public static class EditorApplication { public static void Exit(int c) { } }
-    public static class AssetDatabase { public static void Refresh() { } }
+    public static class AssetDatabase { public static void Refresh() { } public static T LoadAssetAtPath<T>(string p) where T : UnityEngine.Object => null; public static void SaveAssets() { } }
+    public class SerializedProperty { public int arraySize; public UnityEngine.Object objectReferenceValue; public SerializedProperty GetArrayElementAtIndex(int i) => this; public void InsertArrayElementAtIndex(int i) { } }
+    public class SerializedObject { public SerializedObject(UnityEngine.Object o) { } public SerializedProperty FindProperty(string n) => null; public bool ApplyModifiedPropertiesWithoutUndo() => true; }
     public static class EditorPrefs { public static void SetBool(string k, bool v) { } public static void SetString(string k, string v) { } }
     public static class PlayerSettings
     {
