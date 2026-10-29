@@ -50,6 +50,7 @@ cd "$DIR"
 # ------------------------------------------------------------------ 3. Unity + Android
 say "Unity"
 HUB="/Applications/Unity Hub.app/Contents/MacOS/Unity Hub"
+export UNITY_HUB_CLI_NO_DEPRECATION_WARNING=1
 hub() { "$HUB" -- --headless "$@" 2>/dev/null; }
 
 # Prints the folder that contains Unity.app for the newest installed Unity 6, or nothing.
@@ -84,7 +85,7 @@ if [ -z "$EDITOR_DIR" ]; then
   echo "  Sürüm: $VER"
   ARCH="x86_64"
   [ "$(uname -m)" = "arm64" ] && ARCH="arm64"
-  "$HUB" -- --headless install --version "$VER" --architecture "$ARCH" -m android android-sdk-ndk-tools android-open-jdk --childModules \
+  "$HUB" -- --headless install --version "$VER" --architecture "$ARCH" -m android android-sdk-ndk-tools --childModules \
     || die "Unity kurulumu başarısız. Unity Hub'ı açıp Installs → Install Editor → $VER (+ Android Build Support) ile kur."
   EDITOR_DIR="$(find_unity)"
   [ -n "$EDITOR_DIR" ] || die "Kurulum bitti ama Unity bulunamadı. Unity Hub → Installs listesini kontrol et."
@@ -100,7 +101,7 @@ ANDROID_DIR="$EDITOR_DIR/PlaybackEngines/AndroidPlayer"
 if [ ! -d "$ANDROID_DIR/OpenJDK" ] || [ ! -d "$ANDROID_DIR/SDK" ]; then
   say "Android modülü eksik — kuruluyor (birkaç GB)"
   [ -x "$HUB" ] || die "Unity Hub bulunamadı. Hub → Installs → $UNITY_VERSION → Add modules → Android Build Support (+ OpenJDK, SDK & NDK)."
-  "$HUB" -- --headless install-modules --version "$UNITY_VERSION" -m android android-sdk-ndk-tools android-open-jdk --childModules \
+  "$HUB" -- --headless install-modules --version "$UNITY_VERSION" -m android android-sdk-ndk-tools --childModules \
     || die "Modül kurulamadı. Hub'dan elle ekle: Installs → $UNITY_VERSION → Add modules → Android Build Support."
   [ -d "$ANDROID_DIR/OpenJDK" ] || die "Android modülü hâlâ görünmüyor. Hub'dan elle ekleyip tekrar çalıştır."
 fi
