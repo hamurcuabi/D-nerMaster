@@ -182,6 +182,21 @@ if [ ! -d "$ANDROID_DIR" ]; then
 fi
 ok "Android Build Support hazır"
 
+# Unity looks for its tools in AndroidPlayer/{SDK,NDK,OpenJDK}. Link the Mac's own copies there
+# (only where Unity has no copy of its own) so nothing is downloaded twice.
+link_tool() {   # link_tool <name> <target>
+  local dst="$ANDROID_DIR/$1"
+  if [ -L "$dst" ] || [ ! -e "$dst" ]; then
+    ln -sfn "$2" "$dst" || die "Bağlantı oluşturulamadı: $dst → $2"
+    ok "Unity $1 → $2"
+  else
+    ok "Unity $1: kendi kopyası kullanılıyor"
+  fi
+}
+link_tool SDK "$SDK"
+link_tool NDK "$NDK"
+link_tool OpenJDK "$JDK"
+
 # Unity needs a (free) Personal license before it can build, even from the terminal.
 if [ "$FRESH_INSTALL" = "1" ]; then
   say "Unity lisansı"
@@ -253,7 +268,7 @@ export DONER_KEY_ALIAS="$KEY_ALIAS"
 export DONER_VERSION="$VERSION"
 export DONER_VERSION_CODE="$VERSION_CODE"
 export DONER_RELEASE=1
-export DONER_ANDROID_SDK="$SDK" DONER_ANDROID_NDK="$NDK" DONER_JDK="$JDK"
+export DONER_TOOLS_LINKED=1
 bash ./Tools/build-android.sh
 
 APK="Builds/Android/DonerMaster-$VERSION.apk"

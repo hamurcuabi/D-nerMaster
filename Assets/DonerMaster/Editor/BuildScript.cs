@@ -66,41 +66,35 @@ namespace DonerMaster.EditorTools
         }
 
         /// <summary>
-        /// Use the Mac's own Android SDK / NDK / JDK (passed by doner.sh) instead of the copies
-        /// Unity Hub would download into the editor folder.
+        /// doner.sh links the Mac's own SDK / NDK / JDK into the editor's AndroidPlayer folder (where
+        /// Unity's "embedded" tools live), so Unity just uses its defaults. Here we only make sure
+        /// "use embedded" is on (an older run may have switched it off) and log what Unity resolved.
         /// </summary>
         static void ConfigureExternalTools()
         {
-            string sdk = Env("DONER_ANDROID_SDK", ""), ndk = Env("DONER_ANDROID_NDK", ""), jdk = Env("DONER_JDK", "");
-            if (sdk == "" && ndk == "" && jdk == "") return;
+            if (Env("DONER_TOOLS_LINKED", "0") == "1")
+            {
+                EditorPrefs.SetBool("SdkUseEmbedded", true);
+                EditorPrefs.SetBool("NdkUseEmbedded", true);
+                EditorPrefs.SetBool("JdkUseEmbedded", true);
+            }
 
-            // Preference keys behind Preferences → External Tools (stable across Unity versions)
-            if (sdk != "") { EditorPrefs.SetBool("SdkUseEmbedded", false); EditorPrefs.SetString("AndroidSdkRoot", sdk); }
-            if (ndk != "") { EditorPrefs.SetBool("NdkUseEmbedded", false); EditorPrefs.SetString("AndroidNdkRootR16b", ndk); EditorPrefs.SetString("AndroidNdkRoot", ndk); }
-            if (jdk != "") { EditorPrefs.SetBool("JdkUseEmbedded", false); EditorPrefs.SetString("JdkPath", jdk); }
-
-            // Official API (UnityEditor.Android.AndroidExternalToolsSettings). Looked up by reflection
-            // so this script still compiles in an editor without the Android module.
             Type t = null;
             foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
                 t = asm.GetType("UnityEditor.Android.AndroidExternalToolsSettings");
                 if (t != null) break;
             }
-            if (t != null)
-            {
-                SetStatic(t, "sdkRootPath", sdk);
-                SetStatic(t, "ndkRootPath", ndk);
-                SetStatic(t, "jdkRootPath", jdk);
-            }
-            Debug.Log("[DonerBuild] Android tools — SDK: " + sdk + " | NDK: " + ndk + " | JDK: " + jdk);
+            Debug.Log("[DonerBuild] Unity Android tools — SDK: " + GetStatic(t, "sdkRootPath") +
+                      " | NDK: " + GetStatic(t, "ndkRootPath") + " | JDK: " + GetStatic(t, "jdkRootPath"));
         }
 
-        static void SetStatic(Type t, string property, string value)
+        static string GetStatic(Type t, string property)
         {
-            if (string.IsNullOrEmpty(value)) return;
+            if (t == null) return "?";
             var p = t.GetProperty(property, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            if (p != null && p.CanWrite) p.SetValue(null, value);
+            try { return p != null ? (p.GetValue(null) as string ?? "") : "?"; }
+            catch (Exception) { return "?"; }
         }
 
         static void ConfigureAndroid()
