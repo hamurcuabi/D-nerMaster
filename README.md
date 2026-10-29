@@ -9,7 +9,16 @@ Mobil, dükkân yönetimli döner yapma oyunu. Unity 6, C#. Şu an **gri kutu pr
 3. Game penceresini dikey bir telefon çözünürlüğüne al (ör. 1080x1920).
 4. Build almak için: menüden **Doner Master → Create Main Scene (for builds)**. Sahneyi oluşturur, Build Settings'e ekler, dikey ekranı ayarlar.
 
-### Terminalden release APK (macOS)
+### Tek komutla release (macOS)
+
+```bash
+bash doner.sh          # sürümü otomatik artırır (v0.1.0 → v0.1.1)
+bash doner.sh 0.2.0    # belirli sürüm
+```
+
+GitHub girişi, repo güncelleme, Android modülü, imza anahtarı (şifre macOS Anahtar Zinciri'nde), build, GitHub release ve bağlı telefona kurulum — hepsi bu script'te. Anahtar `~/keys/doner-release.keystore`'da, **yedekle**.
+
+### Terminalden release APK (macOS, elle)
 
 ```bash
 # bir kere: Unity Hub → Unity 6 → Add modules → Android Build Support (OpenJDK + SDK/NDK)

@@ -45,7 +45,8 @@ fi
 
 : "${DONER_KEYSTORE:?DONER_KEYSTORE ayarlı değil (keystore dosyasının yolu)}"
 : "${DONER_KEYSTORE_PASS:?DONER_KEYSTORE_PASS ayarlı değil}"
-export DONER_KEYSTORE="$(cd "$(dirname "$DONER_KEYSTORE")" && pwd)/$(basename "$DONER_KEYSTORE")"
+DONER_KEYSTORE="$(cd "$(dirname "$DONER_KEYSTORE")" && pwd)/$(basename "$DONER_KEYSTORE")"
+export DONER_KEYSTORE
 
 mkdir -p Builds
 LOG="Builds/android-build.log"
