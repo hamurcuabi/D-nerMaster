@@ -99,11 +99,17 @@ if [ -z "$SDK" ]; then
 fi
 ok "Android SDK: $SDK"
 
+# Version of an SDK component, read the same way Unity does (source.properties → Pkg.Revision)
+pkg_rev() { sed -n 's/^Pkg.Revision=//p' "$1/source.properties" 2>/dev/null | head -1; }
+# version_ge A B → true when A >= B (dotted versions)
+version_ge() { [ -n "$1" ] && [ "$(printf '%s\n%s\n' "$2" "$1" | sort -V | head -1)" = "$2" ]; }
+
 MISSING=()
 [ -d "$SDK/platforms/android-36" ] || MISSING+=("platforms;android-36")
 BT="$(ls "$SDK/build-tools" 2>/dev/null | sort -V | tail -1 || true)"
-[ -n "$BT" ] && [ "${BT%%.*}" -ge 34 ] 2>/dev/null || MISSING+=("build-tools;36.0.0")
-[ -x "$SDK/platform-tools/adb" ] || MISSING+=("platform-tools")
+version_ge "$BT" "36.0.0" || MISSING+=("build-tools;36.0.0")
+# Unity 6 refuses to build with platform-tools older than 37 (and can't update it in batch mode)
+version_ge "$(pkg_rev "$SDK/platform-tools")" "37.0.0" || MISSING+=("platform-tools")
 [ -d "$SDK/ndk/$NDK_VER" ] || MISSING+=("ndk;$NDK_VER")
 [ -d "$SDK/cmake/3.22.1" ] || MISSING+=("cmake;3.22.1")     # Unity 6 build step requires exactly this
 
