@@ -64,6 +64,9 @@ set -e
 
 grep "\[DonerBuild\]" "$LOG" || true
 if [ $CODE -ne 0 ]; then
+  if grep -qiE "no valid unity editor license|license is not active|licens(e|ing).*(fail|error|not found)" "$LOG"; then
+    echo "Unity lisansı yok. Unity Hub'ı aç → giriş yap → Preferences → Licenses → Add → Get a free personal license. Sonra tekrar çalıştır."
+  fi
   echo "Build başarısız (exit $CODE). Hatalar için: grep -i error $LOG"
   exit $CODE
 fi

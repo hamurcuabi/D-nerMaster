@@ -49,28 +49,70 @@ cd "$DIR"
 
 # ------------------------------------------------------------------ 3. Unity + Android
 say "Unity"
+HUB="/Applications/Unity Hub.app/Contents/MacOS/Unity Hub"
+hub() { "$HUB" -- --headless "$@" 2>/dev/null; }
+
+# Prints the folder that contains Unity.app for the newest installed Unity 6, or nothing.
+find_unity() {
+  local d
+  d="$(ls -d /Applications/Unity/Hub/Editor/6000.* 2>/dev/null | sort -V | tail -1 || true)"
+  if [ -z "$d" ] && [ -x "$HUB" ]; then
+    # Hub may install editors to a custom folder — ask it
+    d="$(hub editors -i | grep -Eo '/[^,]*/6000\.[^/,]*/Unity\.app' | sed 's|/Unity\.app$||' | sort -V | tail -1 || true)"
+  fi
+  echo "$d"
+}
+
 if [ -n "${UNITY_PATH:-}" ]; then
-  UNITY="$UNITY_PATH"
-  EDITOR_DIR="$(cd "$(dirname "$UNITY")/../../.." && pwd)"
+  EDITOR_DIR="$(cd "$(dirname "$UNITY_PATH")/../../.." && pwd)"
 else
-  EDITOR_DIR="$(ls -d /Applications/Unity/Hub/Editor/6000.* 2>/dev/null | sort -V | tail -1 || true)"
-  [ -n "$EDITOR_DIR" ] || die "Unity 6 bulunamadı. Unity Hub'dan Unity 6 kur (Installs → Install Editor)."
-  UNITY="$EDITOR_DIR/Unity.app/Contents/MacOS/Unity"
+  EDITOR_DIR="$(find_unity)"
 fi
+
+FRESH_INSTALL=0
+if [ -z "$EDITOR_DIR" ]; then
+  if [ ! -x "$HUB" ]; then
+    say "Unity Hub kuruluyor"
+    command -v brew >/dev/null || die "Homebrew yok. https://brew.sh kur ya da Unity Hub'ı unity.com'dan indir."
+    brew install --cask unity-hub
+  fi
+  say "Unity 6 + Android modülü kuruluyor (~10 GB indirme, 15-40 dk sürebilir)"
+  RELEASES="$(hub editors -r || true)"
+  VER="$(echo "$RELEASES" | grep -Eo '6000\.0\.[0-9]+f[0-9]+' | sort -V | tail -1 || true)"   # Unity 6 LTS
+  [ -n "$VER" ] || VER="$(echo "$RELEASES" | grep -Eo '6000\.[0-9]+\.[0-9]+f[0-9]+' | sort -V | tail -1 || true)"
+  [ -n "$VER" ] || die "Hub'dan Unity 6 sürüm listesi alınamadı. Unity Hub'ı bir kere açıp giriş yap, sonra tekrar çalıştır."
+  echo "  Sürüm: $VER"
+  ARCH="x86_64"
+  [ "$(uname -m)" = "arm64" ] && ARCH="arm64"
+  "$HUB" -- --headless install --version "$VER" --architecture "$ARCH" -m android android-sdk-ndk-tools android-open-jdk --childModules \
+    || die "Unity kurulumu başarısız. Unity Hub'ı açıp Installs → Install Editor → $VER (+ Android Build Support) ile kur."
+  EDITOR_DIR="$(find_unity)"
+  [ -n "$EDITOR_DIR" ] || die "Kurulum bitti ama Unity bulunamadı. Unity Hub → Installs listesini kontrol et."
+  FRESH_INSTALL=1
+fi
+
+UNITY="${UNITY_PATH:-$EDITOR_DIR/Unity.app/Contents/MacOS/Unity}"
 [ -x "$UNITY" ] || die "Unity çalıştırılabilir dosyası yok: $UNITY"
 UNITY_VERSION="$(basename "$EDITOR_DIR")"
 ok "Unity $UNITY_VERSION"
 
 ANDROID_DIR="$EDITOR_DIR/PlaybackEngines/AndroidPlayer"
 if [ ! -d "$ANDROID_DIR/OpenJDK" ] || [ ! -d "$ANDROID_DIR/SDK" ]; then
-  say "Android modülü eksik — Unity Hub ile kuruluyor (birkaç GB, biraz sürer)"
-  HUB="/Applications/Unity Hub.app/Contents/MacOS/Unity Hub"
+  say "Android modülü eksik — kuruluyor (birkaç GB)"
   [ -x "$HUB" ] || die "Unity Hub bulunamadı. Hub → Installs → $UNITY_VERSION → Add modules → Android Build Support (+ OpenJDK, SDK & NDK)."
   "$HUB" -- --headless install-modules --version "$UNITY_VERSION" -m android android-sdk-ndk-tools android-open-jdk --childModules \
     || die "Modül kurulamadı. Hub'dan elle ekle: Installs → $UNITY_VERSION → Add modules → Android Build Support."
   [ -d "$ANDROID_DIR/OpenJDK" ] || die "Android modülü hâlâ görünmüyor. Hub'dan elle ekleyip tekrar çalıştır."
 fi
 ok "Android Build Support hazır"
+
+# Unity needs a (free) Personal license before it can build, even from the terminal.
+if [ "$FRESH_INSTALL" = "1" ]; then
+  say "Unity lisansı"
+  echo "  Unity Hub açılıyor: giriş yap → Preferences (⚙) → Licenses → Add → 'Get a free personal license'."
+  open -a "Unity Hub" 2>/dev/null || true
+  read -r -p "  Lisansı aldıktan sonra Enter'a bas... " _
+fi
 
 # Project must not be open in the editor
 if pgrep -f "Unity.app/Contents/MacOS/Unity.*-projectpath.*$(basename "$DIR")" >/dev/null 2>&1 \
