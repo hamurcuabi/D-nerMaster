@@ -182,16 +182,23 @@ if [ ! -d "$ANDROID_DIR" ]; then
 fi
 ok "Android Build Support hazır"
 
-# Unity looks for its tools in AndroidPlayer/{SDK,NDK,OpenJDK}. Link the Mac's own copies there
-# (only where Unity has no copy of its own) so nothing is downloaded twice.
+# Unity looks for its tools in AndroidPlayer/{SDK,NDK,OpenJDK}. Link the Mac's own copies there so
+# Unity always uses them. A folder Unity Hub left there (often a half-finished download) is moved
+# aside to <name>.hub-backup, not deleted.
 link_tool() {   # link_tool <name> <target>
   local dst="$ANDROID_DIR/$1"
-  if [ -L "$dst" ] || [ ! -e "$dst" ]; then
-    ln -sfn "$2" "$dst" || die "Bağlantı oluşturulamadı: $dst → $2"
-    ok "Unity $1 → $2"
+  if [ -L "$dst" ]; then
+    [ "$(readlink "$dst")" = "$2" ] || ln -sfn "$2" "$dst" || die "Bağlantı güncellenemedi: $dst"
   else
-    ok "Unity $1: kendi kopyası kullanılıyor"
+    if [ -e "$dst" ]; then
+      local bak="$dst.hub-backup"
+      [ -e "$bak" ] && bak="$dst.hub-backup-$(date +%s)"
+      mv "$dst" "$bak" || die "$dst kenara alınamadı."
+      echo "  Unity Hub'ın $1 klasörü kenara alındı: $bak"
+    fi
+    ln -s "$2" "$dst" || die "Bağlantı oluşturulamadı: $dst → $2"
   fi
+  ok "Unity $1 → $2"
 }
 link_tool SDK "$SDK"
 link_tool NDK "$NDK"

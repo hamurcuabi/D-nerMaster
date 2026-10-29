@@ -85,8 +85,11 @@ namespace DonerMaster.EditorTools
                 t = asm.GetType("UnityEditor.Android.AndroidExternalToolsSettings");
                 if (t != null) break;
             }
-            Debug.Log("[DonerBuild] Unity Android tools — SDK: " + GetStatic(t, "sdkRootPath") +
-                      " | NDK: " + GetStatic(t, "ndkRootPath") + " | JDK: " + GetStatic(t, "jdkRootPath"));
+            string sdk = GetStatic(t, "sdkRootPath");
+            string pt = Path.Combine(sdk, "platform-tools", "source.properties");
+            Debug.Log("[DonerBuild] Unity Android tools — SDK: " + sdk +
+                      " | NDK: " + GetStatic(t, "ndkRootPath") + " | JDK: " + GetStatic(t, "jdkRootPath") +
+                      " | platform-tools: " + (File.Exists(pt) ? File.ReadAllText(pt).Replace("\n", " ").Trim() : "YOK (" + pt + ")"));
         }
 
         static string GetStatic(Type t, string property)
