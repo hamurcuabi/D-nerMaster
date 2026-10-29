@@ -70,8 +70,11 @@ namespace DonerMaster.EditorTools
 
             // Google Play requirements: IL2CPP + 64-bit
             PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
-            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64 | AndroidArchitecture.ARMv7;
+            // ARM64 only: Play needs 64-bit, and Unity's 32-bit libs have had 16 KB page-size issues.
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel24;
+            // Google Play: new apps and updates must target Android 16 (API 36) since 31 Aug 2026.
+            PlayerSettings.Android.targetSdkVersion = (AndroidSdkVersions)int.Parse(Env("DONER_TARGET_SDK", "36"));
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
 
             // Release signing (required for an installable release APK)

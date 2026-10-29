@@ -423,7 +423,7 @@ namespace UnityEditor
         public static void SetScriptingBackend(Build.NamedBuildTarget t, ScriptingImplementation s) { }
         public static class Android
         {
-            public static int bundleVersionCode; public static AndroidArchitecture targetArchitectures; public static AndroidSdkVersions minSdkVersion;
+            public static int bundleVersionCode; public static AndroidArchitecture targetArchitectures; public static AndroidSdkVersions minSdkVersion, targetSdkVersion;
             public static bool useCustomKeystore; public static string keystoreName, keystorePass, keyaliasName, keyaliasPass;
         }
     }

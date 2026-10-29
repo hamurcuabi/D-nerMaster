@@ -106,6 +106,18 @@ if [ ! -d "$ANDROID_DIR/OpenJDK" ] || [ ! -d "$ANDROID_DIR/SDK" ]; then
 fi
 ok "Android Build Support hazır"
 
+# Google Play requires targetSdk 36 — make sure that SDK platform is installed
+if [ ! -d "$ANDROID_DIR/SDK/platforms/android-36" ]; then
+  SDKM="$(ls "$ANDROID_DIR"/SDK/cmdline-tools/*/bin/sdkmanager 2>/dev/null | sort -V | tail -1 || true)"
+  if [ -n "$SDKM" ]; then
+    say "Android SDK 36 (Play zorunluluğu) kuruluyor"
+    export JAVA_HOME="$ANDROID_DIR/OpenJDK"
+    yes | "$SDKM" --licenses >/dev/null 2>&1 || true
+    "$SDKM" "platforms;android-36" "build-tools;36.0.0" >/dev/null || die "Android SDK 36 kurulamadı ($SDKM)."
+  fi
+fi
+ok "Android SDK hazır"
+
 # Unity needs a (free) Personal license before it can build, even from the terminal.
 if [ "$FRESH_INSTALL" = "1" ]; then
   say "Unity lisansı"
