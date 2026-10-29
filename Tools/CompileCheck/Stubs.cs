@@ -167,8 +167,8 @@ namespace UnityEngine
     public static class Time { public static float time, deltaTime, unscaledTime; }
     public static class Screen { public static int width, height; public static int sleepTimeout; }
     public static class SleepTimeout { public const int NeverSleep = -1; }
-    public static class Application { public static int targetFrameRate; public static bool isPlaying; }
-    public static class Debug { public static void Log(object o) { } public static void LogWarning(object o) { } }
+    public static class Application { public static int targetFrameRate; public static bool isPlaying; public static bool isBatchMode; }
+    public static class Debug { public static void Log(object o) { } public static void LogWarning(object o) { } public static void LogError(object o) { } }
     public static class PlayerPrefs
     {
         public static string GetString(string k, string d) => d; public static void SetString(string k, string v) { }
@@ -404,7 +404,36 @@ namespace UnityEditor
     public class EditorBuildSettingsScene { public EditorBuildSettingsScene(string p, bool e) { } public string path => ""; }
     public static class EditorBuildSettings { public static EditorBuildSettingsScene[] scenes { get; set; } }
     public enum UIOrientation { Portrait, AutoRotation }
-    public static class PlayerSettings { public static UIOrientation defaultInterfaceOrientation { get; set; } }
+    public enum ScriptingImplementation { Mono2x, IL2CPP }
+    [Flags] public enum AndroidArchitecture { None = 0, ARMv7 = 1, ARM64 = 2 }
+    public enum AndroidSdkVersions { AndroidApiLevel24 = 24 }
+    public enum BuildTarget { Android = 13 }
+    public enum BuildTargetGroup { Android = 7 }
+    [Flags] public enum BuildOptions { None = 0 }
+    public struct BuildPlayerOptions { public string[] scenes; public string locationPathName; public BuildTarget target; public BuildTargetGroup targetGroup; public BuildOptions options; }
+    public static class BuildPipeline { public static Build.Reporting.BuildReport BuildPlayer(BuildPlayerOptions o) => null; }
+    public static class EditorUserBuildSettings { public static bool buildAppBundle, development; }
+    public static class EditorApplication { public static void Exit(int c) { } }
+    public static class AssetDatabase { public static void Refresh() { } }
+    public static class PlayerSettings
+    {
+        public static UIOrientation defaultInterfaceOrientation { get; set; }
+        public static string companyName, productName, bundleVersion;
+        public static void SetApplicationIdentifier(Build.NamedBuildTarget t, string id) { }
+        public static void SetScriptingBackend(Build.NamedBuildTarget t, ScriptingImplementation s) { }
+        public static class Android
+        {
+            public static int bundleVersionCode; public static AndroidArchitecture targetArchitectures; public static AndroidSdkVersions minSdkVersion;
+            public static bool useCustomKeystore; public static string keystoreName, keystorePass, keyaliasName, keyaliasPass;
+        }
+    }
+}
+namespace UnityEditor.Build { public struct NamedBuildTarget { public static NamedBuildTarget Android => default; } }
+namespace UnityEditor.Build.Reporting
+{
+    public enum BuildResult { Unknown, Succeeded, Failed, Cancelled }
+    public struct BuildSummary { public BuildResult result; public int totalErrors; public ulong totalSize; }
+    public class BuildReport { public BuildSummary summary => default; }
 }
 namespace UnityEditor.SceneManagement
 {

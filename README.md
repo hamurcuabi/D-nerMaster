@@ -9,6 +9,19 @@ Mobil, dükkân yönetimli döner yapma oyunu. Unity 6, C#. Şu an **gri kutu pr
 3. Game penceresini dikey bir telefon çözünürlüğüne al (ör. 1080x1920).
 4. Build almak için: menüden **Doner Master → Create Main Scene (for builds)**. Sahneyi oluşturur, Build Settings'e ekler, dikey ekranı ayarlar.
 
+### Terminalden release APK (macOS)
+
+```bash
+# bir kere: Unity Hub → Unity 6 → Add modules → Android Build Support (OpenJDK + SDK/NDK)
+keytool -genkeypair -v -keystore ~/keys/doner-release.keystore -alias doner -keyalg RSA -keysize 2048 -validity 10000
+
+export DONER_KEYSTORE=~/keys/doner-release.keystore
+export DONER_KEYSTORE_PASS='şifren'
+./Tools/build-android.sh            # → Builds/Android/DonerMaster-0.1.0.apk
+```
+
+Sürüm: `DONER_VERSION=0.2.0 DONER_VERSION_CODE=2`. Play Store için AAB: `DONER_AAB=1`. Build sırasında proje Unity editöründe açık olmamalı.
+
 Diğer menüler: **Reset Save Data**, **Give 1000 Coins (debug)** (Play modundayken).
 
 ## Nasıl oynanır

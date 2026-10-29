@@ -41,3 +41,7 @@ Thumbs.db
 
 
 
+
+# Signing keys (never commit)
+*.keystore
+*.jks
