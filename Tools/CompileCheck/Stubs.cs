@@ -415,6 +415,7 @@ namespace UnityEditor
     public static class EditorUserBuildSettings { public static bool buildAppBundle, development; }
     public static class EditorApplication { public static void Exit(int c) { } }
     public static class AssetDatabase { public static void Refresh() { } }
+    public static class EditorPrefs { public static void SetBool(string k, bool v) { } public static void SetString(string k, string v) { } }
     public static class PlayerSettings
     {
         public static UIOrientation defaultInterfaceOrientation { get; set; }

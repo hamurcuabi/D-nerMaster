@@ -4,7 +4,8 @@
 #   bash doner.sh            → sürümü otomatik artırır (v0.1.0 → v0.1.1 ...)
 #   bash doner.sh 0.2.0      → belirli sürüm
 #
-# Yaptıkları: GitHub girişi → repo indir/güncelle → Unity + Android modülü kontrolü
+# Yaptıkları: GitHub girişi → repo indir/güncelle → Mac'teki Android SDK/NDK/JDK'yı bulur, sadece
+# eksiği indirir → Unity + Android Build Support (alt paketsiz)
 # → imza anahtarı (yoksa oluşturur, şifreyi macOS Anahtar Zinciri'ne kaydeder)
 # → APK build → GitHub release → telefon bağlıysa kurar.
 set -euo pipefail
@@ -47,7 +48,75 @@ else
 fi
 cd "$DIR"
 
-# ------------------------------------------------------------------ 3. Unity + Android
+# ------------------------------------------------------------------ 3. Android araçları (Mac'teki mevcut kurulum)
+# Önce senin SDK/NDK/JDK'na bakar; sadece eksik olanı indirir.
+say "Android araçları"
+NDK_VER="${DONER_NDK_VERSION:-27.2.12479018}"     # NDK r27c — Unity 6'nın istediği sürüm
+
+is_jdk17() { [ -x "$1/bin/java" ] && grep -q 'JAVA_VERSION="17' "$1/release" 2>/dev/null; }
+find_jdk17() {
+  local c
+  for c in "${DONER_JDK:-}" "$(/usr/libexec/java_home -v 17 2>/dev/null || true)" \
+           "/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+           /Library/Java/JavaVirtualMachines/*17*/Contents/Home \
+           /opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+           /usr/local/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home; do
+    [ -n "$c" ] && is_jdk17 "$c" && { echo "$c"; return; }
+  done
+}
+find_sdk() {
+  local c
+  for c in "${DONER_ANDROID_SDK:-}" "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$HOME/Library/Android/sdk" \
+           /opt/homebrew/share/android-commandlinetools /usr/local/share/android-commandlinetools; do
+    [ -n "$c" ] && { [ -d "$c/platforms" ] || [ -d "$c/cmdline-tools" ]; } && { echo "$c"; return; }
+  done
+}
+find_sdkmanager() {
+  local m
+  m="$(ls "$1"/cmdline-tools/*/bin/sdkmanager 2>/dev/null | sort -V | tail -1 || true)"
+  [ -z "$m" ] && m="$(command -v sdkmanager || true)"
+  echo "$m"
+}
+
+JDK="$(find_jdk17)"
+if [ -z "$JDK" ]; then
+  echo "  JDK 17 yok — kuruluyor (~190 MB)"
+  command -v brew >/dev/null || die "JDK 17 bulunamadı ve Homebrew yok. https://adoptium.net'ten JDK 17 kur."
+  brew install --cask temurin@17
+  JDK="$(find_jdk17)"
+  [ -n "$JDK" ] || die "JDK 17 kuruldu ama bulunamadı. DONER_JDK=/yol/jdk17 ile ver."
+fi
+ok "JDK 17: $JDK"
+export JAVA_HOME="$JDK"
+
+SDK="$(find_sdk)"
+if [ -z "$SDK" ]; then
+  echo "  Android SDK yok — sadece komut satırı araçları kuruluyor (~150 MB)"
+  command -v brew >/dev/null || die "Android SDK bulunamadı. Android Studio ile kur ya da DONER_ANDROID_SDK=/yol ver."
+  brew install --cask android-commandlinetools
+  SDK="$(find_sdk)"
+  [ -n "$SDK" ] || die "Android SDK kurulumu bulunamadı."
+fi
+ok "Android SDK: $SDK"
+
+MISSING=()
+[ -d "$SDK/platforms/android-36" ] || MISSING+=("platforms;android-36")
+BT="$(ls "$SDK/build-tools" 2>/dev/null | sort -V | tail -1 || true)"
+[ -n "$BT" ] && [ "${BT%%.*}" -ge 34 ] 2>/dev/null || MISSING+=("build-tools;36.0.0")
+[ -x "$SDK/platform-tools/adb" ] || MISSING+=("platform-tools")
+[ -d "$SDK/ndk/$NDK_VER" ] || MISSING+=("ndk;$NDK_VER")
+
+if [ ${#MISSING[@]} -gt 0 ]; then
+  SDKM="$(find_sdkmanager "$SDK")"
+  [ -n "$SDKM" ] || die "sdkmanager bulunamadı. Android Studio → SDK Manager → SDK Tools → 'Android SDK Command-line Tools' kur."
+  echo "  Eksik olanlar indiriliyor: ${MISSING[*]}"
+  yes | "$SDKM" --sdk_root="$SDK" --licenses >/dev/null 2>&1 || true
+  "$SDKM" --sdk_root="$SDK" "${MISSING[@]}" || die "SDK paketleri kurulamadı: ${MISSING[*]}"
+fi
+ok "platform 36, build-tools, adb ve NDK r27c hazır (indirilen: ${#MISSING[@]} paket)"
+NDK="$SDK/ndk/$NDK_VER"
+
+# ------------------------------------------------------------------ 4. Unity
 say "Unity"
 HUB="/Applications/Unity Hub.app/Contents/MacOS/Unity Hub"
 export UNITY_HUB_CLI_NO_DEPRECATION_WARNING=1
@@ -77,15 +146,14 @@ if [ -z "$EDITOR_DIR" ]; then
     command -v brew >/dev/null || die "Homebrew yok. https://brew.sh kur ya da Unity Hub'ı unity.com'dan indir."
     brew install --cask unity-hub
   fi
-  say "Unity 6 + Android modülü kuruluyor (~10 GB indirme, 15-40 dk sürebilir)"
   RELEASES="$(hub editors -r || true)"
   VER="$(echo "$RELEASES" | grep -Eo '6000\.0\.[0-9]+f[0-9]+' | sort -V | tail -1 || true)"   # Unity 6 LTS
   [ -n "$VER" ] || VER="$(echo "$RELEASES" | grep -Eo '6000\.[0-9]+\.[0-9]+f[0-9]+' | sort -V | tail -1 || true)"
   [ -n "$VER" ] || die "Hub'dan Unity 6 sürüm listesi alınamadı. Unity Hub'ı bir kere açıp giriş yap, sonra tekrar çalıştır."
-  echo "  Sürüm: $VER"
+  say "Unity $VER + sadece Android Build Support kuruluyor (SDK/NDK/JDK Mac'tekilerden kullanılacak)"
   ARCH="x86_64"
   [ "$(uname -m)" = "arm64" ] && ARCH="arm64"
-  "$HUB" -- --headless install --version "$VER" --architecture "$ARCH" -m android android-sdk-ndk-tools --childModules \
+  "$HUB" -- --headless install --version "$VER" --architecture "$ARCH" -m android \
     || die "Unity kurulumu başarısız. Unity Hub'ı açıp Installs → Install Editor → $VER (+ Android Build Support) ile kur."
   EDITOR_DIR="$(find_unity)"
   [ -n "$EDITOR_DIR" ] || die "Kurulum bitti ama Unity bulunamadı. Unity Hub → Installs listesini kontrol et."
@@ -98,26 +166,14 @@ UNITY_VERSION="$(basename "$EDITOR_DIR")"
 ok "Unity $UNITY_VERSION"
 
 ANDROID_DIR="$EDITOR_DIR/PlaybackEngines/AndroidPlayer"
-if [ ! -d "$ANDROID_DIR/OpenJDK" ] || [ ! -d "$ANDROID_DIR/SDK" ]; then
-  say "Android modülü eksik — kuruluyor (birkaç GB)"
-  [ -x "$HUB" ] || die "Unity Hub bulunamadı. Hub → Installs → $UNITY_VERSION → Add modules → Android Build Support (+ OpenJDK, SDK & NDK)."
-  "$HUB" -- --headless install-modules --version "$UNITY_VERSION" -m android android-sdk-ndk-tools --childModules \
+if [ ! -d "$ANDROID_DIR" ]; then
+  say "Unity Android Build Support kuruluyor (SDK/NDK alt paketleri olmadan)"
+  [ -x "$HUB" ] || die "Unity Hub bulunamadı. Hub → Installs → $UNITY_VERSION → Add modules → Android Build Support (alt kutuları işaretleme)."
+  "$HUB" -- --headless install-modules --version "$UNITY_VERSION" -m android \
     || die "Modül kurulamadı. Hub'dan elle ekle: Installs → $UNITY_VERSION → Add modules → Android Build Support."
-  [ -d "$ANDROID_DIR/OpenJDK" ] || die "Android modülü hâlâ görünmüyor. Hub'dan elle ekleyip tekrar çalıştır."
+  [ -d "$ANDROID_DIR" ] || die "Android modülü hâlâ görünmüyor. Hub'dan elle ekleyip tekrar çalıştır."
 fi
 ok "Android Build Support hazır"
-
-# Google Play requires targetSdk 36 — make sure that SDK platform is installed
-if [ ! -d "$ANDROID_DIR/SDK/platforms/android-36" ]; then
-  SDKM="$(ls "$ANDROID_DIR"/SDK/cmdline-tools/*/bin/sdkmanager 2>/dev/null | sort -V | tail -1 || true)"
-  if [ -n "$SDKM" ]; then
-    say "Android SDK 36 (Play zorunluluğu) kuruluyor"
-    export JAVA_HOME="$ANDROID_DIR/OpenJDK"
-    yes | "$SDKM" --licenses >/dev/null 2>&1 || true
-    "$SDKM" "platforms;android-36" "build-tools;36.0.0" >/dev/null || die "Android SDK 36 kurulamadı ($SDKM)."
-  fi
-fi
-ok "Android SDK hazır"
 
 # Unity needs a (free) Personal license before it can build, even from the terminal.
 if [ "$FRESH_INSTALL" = "1" ]; then
@@ -133,9 +189,9 @@ if pgrep -f "Unity.app/Contents/MacOS/Unity.*-projectpath.*$(basename "$DIR")" >
   die "Proje Unity editöründe açık. Kapatıp tekrar çalıştır."
 fi
 
-# ------------------------------------------------------------------ 4. Signing key
+# ------------------------------------------------------------------ 5. Signing key
 say "İmza anahtarı"
-KEYTOOL="$ANDROID_DIR/OpenJDK/bin/keytool"
+KEYTOOL="$JDK/bin/keytool"
 PASS="$(security find-generic-password -a "$USER" -s "$KEYCHAIN_SERVICE" -w 2>/dev/null || true)"
 if [ ! -f "$KEYSTORE" ]; then
   echo "  Release anahtarı yok, oluşturuluyor: $KEYSTORE"
@@ -163,7 +219,7 @@ else
   ok "$KEYSTORE"
 fi
 
-# ------------------------------------------------------------------ 5. Version
+# ------------------------------------------------------------------ 6. Version
 say "Sürüm"
 if [ $# -ge 1 ]; then
   VERSION="${1#v}"
@@ -181,7 +237,7 @@ IFS=. read -r MA MI PA <<< "$VERSION"
 VERSION_CODE=$((MA * 10000 + MI * 100 + PA))
 ok "v$VERSION (versionCode $VERSION_CODE)"
 
-# ------------------------------------------------------------------ 6. Build + release
+# ------------------------------------------------------------------ 7. Build + release
 say "Build + GitHub release"
 export UNITY_PATH="$UNITY"
 export DONER_KEYSTORE="$KEYSTORE"
@@ -190,12 +246,13 @@ export DONER_KEY_ALIAS="$KEY_ALIAS"
 export DONER_VERSION="$VERSION"
 export DONER_VERSION_CODE="$VERSION_CODE"
 export DONER_RELEASE=1
+export DONER_ANDROID_SDK="$SDK" DONER_ANDROID_NDK="$NDK" DONER_JDK="$JDK"
 bash ./Tools/build-android.sh
 
 APK="Builds/Android/DonerMaster-$VERSION.apk"
 
-# ------------------------------------------------------------------ 7. Install on a connected phone
-ADB="$ANDROID_DIR/SDK/platform-tools/adb"
+# ------------------------------------------------------------------ 8. Install on a connected phone
+ADB="$SDK/platform-tools/adb"
 if [ -x "$ADB" ] && [ -f "$APK" ] && "$ADB" devices | grep -q "device$"; then
   say "Telefona kuruluyor"
   "$ADB" install -r "$APK" && ok "kuruldu"

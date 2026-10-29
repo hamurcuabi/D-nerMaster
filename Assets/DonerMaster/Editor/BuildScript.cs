@@ -24,6 +24,7 @@ namespace DonerMaster.EditorTools
             try
             {
                 EnsureMainScene();
+                ConfigureExternalTools();
                 ConfigureAndroid();
 
                 bool aab = Env("DONER_AAB", "0") == "1";
@@ -57,6 +58,44 @@ namespace DonerMaster.EditorTools
                 Debug.LogError("[DonerBuild] " + e);
                 Exit(1);
             }
+        }
+
+        /// <summary>
+        /// Use the Mac's own Android SDK / NDK / JDK (passed by doner.sh) instead of the copies
+        /// Unity Hub would download into the editor folder.
+        /// </summary>
+        static void ConfigureExternalTools()
+        {
+            string sdk = Env("DONER_ANDROID_SDK", ""), ndk = Env("DONER_ANDROID_NDK", ""), jdk = Env("DONER_JDK", "");
+            if (sdk == "" && ndk == "" && jdk == "") return;
+
+            // Preference keys behind Preferences → External Tools (stable across Unity versions)
+            if (sdk != "") { EditorPrefs.SetBool("SdkUseEmbedded", false); EditorPrefs.SetString("AndroidSdkRoot", sdk); }
+            if (ndk != "") { EditorPrefs.SetBool("NdkUseEmbedded", false); EditorPrefs.SetString("AndroidNdkRootR16b", ndk); EditorPrefs.SetString("AndroidNdkRoot", ndk); }
+            if (jdk != "") { EditorPrefs.SetBool("JdkUseEmbedded", false); EditorPrefs.SetString("JdkPath", jdk); }
+
+            // Official API (UnityEditor.Android.AndroidExternalToolsSettings). Looked up by reflection
+            // so this script still compiles in an editor without the Android module.
+            Type t = null;
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                t = asm.GetType("UnityEditor.Android.AndroidExternalToolsSettings");
+                if (t != null) break;
+            }
+            if (t != null)
+            {
+                SetStatic(t, "sdkRootPath", sdk);
+                SetStatic(t, "ndkRootPath", ndk);
+                SetStatic(t, "jdkRootPath", jdk);
+            }
+            Debug.Log("[DonerBuild] Android tools — SDK: " + sdk + " | NDK: " + ndk + " | JDK: " + jdk);
+        }
+
+        static void SetStatic(Type t, string property, string value)
+        {
+            if (string.IsNullOrEmpty(value)) return;
+            var p = t.GetProperty(property, System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+            if (p != null && p.CanWrite) p.SetValue(null, value);
         }
 
         static void ConfigureAndroid()
